@@ -362,7 +362,11 @@ class ChipMelsaveBuilder(Star):
             yield event.plain_result("文件在发送前丢失，请检查磁盘空间和权限。")
             return
 
-        yield event.chain_result([Comp.File(file=str(target), name=target.name)])
+        # 优先尝试 OneBot v11 直接上传，失败时回退到 Comp.File
+        if not await self._upload_file_via_onebot_v11(event, target):
+            yield event.chain_result(
+                [Comp.File(file=str(target), name=target.name)]
+            )
 
     # （保留旧工具，向后兼容，仅命名）
     # @llm_tool(name="build_chip_melsave")
@@ -427,7 +431,60 @@ class ChipMelsaveBuilder(Star):
             yield event.plain_result("文件在发送前丢失，请检查磁盘空间和权限。")
             return
 
-        yield event.chain_result([Comp.File(file=str(target), name=target.name)])
+        # 优先尝试 OneBot v11 直接上传，失败时回退到 Comp.File
+        if not await self._upload_file_via_onebot_v11(event, target):
+            yield event.chain_result(
+                [Comp.File(file=str(target), name=target.name)]
+            )
+
+    # ---------- OneBot v11 直接文件上传 ----------
+    async def _upload_file_via_onebot_v11(
+        self, event: AstrMessageEvent, file_path: Path
+    ) -> bool:
+        """尝试使用 OneBot v11 API 直接上传文件。
+
+        优先使用 OneBot v11 的 upload_group_file 或 upload_private_file API。
+        如果成功返回 True，失败返回 False（由调用方回退到标准 Comp.File 方式）。
+        """
+        # 仅对 OneBot v11 (aiocqhttp) 平台生效
+        if event.get_platform_name() != "aiocqhttp":
+            return False
+
+        bot = getattr(event, "bot", None)
+        if bot is None:
+            return False
+
+        group_id = event.get_group_id()
+        user_id = event.get_sender_id()
+        is_group = bool(group_id)
+
+        try:
+            file_str = str(file_path.resolve())
+            if is_group and group_id:
+                await bot.call_action(
+                    "upload_group_file",
+                    group_id=int(group_id),
+                    file=file_str,
+                    name=file_path.name,
+                )
+                print(f"[chip-plugin] 通过 OneBot v11 上传文件到群 {group_id}")
+                return True
+            elif user_id:
+                await bot.call_action(
+                    "upload_private_file",
+                    user_id=int(user_id),
+                    file=file_str,
+                    name=file_path.name,
+                )
+                print(f"[chip-plugin] 通过 OneBot v11 上传文件给用户 {user_id}")
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(
+                f"[chip-plugin] OneBot v11 上传失败: {e}，将回退到标准文件发送方式"
+            )
+            return False
 
     # ---------- 图片转DSL功能 ----------
     async def _extract_image_from_message(
@@ -891,7 +948,11 @@ class ChipMelsaveBuilder(Star):
             return
 
         yield event.plain_result(f"✅ 图片芯片生成成功！尺寸: {width}x{height}")
-        yield event.chain_result([Comp.File(file=str(target), name=target.name)])
+        # 优先尝试 OneBot v11 直接上传，失败时回退到 Comp.File
+        if not await self._upload_file_via_onebot_v11(event, target):
+            yield event.chain_result(
+                [Comp.File(file=str(target), name=target.name)]
+            )
 
     # 便捷指令：让 LLM 主导对话并可调用上面两个工具
     @filter.command("freeze", alias={"冻结存档", "freeze存档"})
@@ -926,9 +987,11 @@ class ChipMelsaveBuilder(Star):
                 "处理完成，没有发现需要从 false 改为 true 的 freezed 字段。"
             )
 
-        yield event.chain_result(
-            [Comp.File(file=str(output_path), name=output_path.name)]
-        )
+        # 优先尝试 OneBot v11 直接上传，失败时回退到 Comp.File
+        if not await self._upload_file_via_onebot_v11(event, output_path):
+            yield event.chain_result(
+                [Comp.File(file=str(output_path), name=output_path.name)]
+            )
 
     @filter.command("chip")
     async def chip(self, event: AstrMessageEvent):
