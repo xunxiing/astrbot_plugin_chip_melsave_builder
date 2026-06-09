@@ -1,0 +1,30 @@
+{
+  "enable_llm_naming": {
+    "description": "是否启用由 LLM 命名（保留兼容字段，不再强制依赖）",
+    "type": "bool",
+    "default": true
+  },
+  "vendor_entry": {
+    "description": "工程入口脚本相对路径",
+    "type": "string",
+    "default": "vendor_pipeline/main.py"
+  },
+  "dsl_target_path": {
+    "description": "写入 DSL 的目标文件（相对插件根目录）",
+    "type": "string",
+    "default": "vendor_pipeline/input.py"
+  },
+  "dsl_wrapper": {
+    "description": "DSL 包裹模板；留空则原样写入。使用 {dsl} 占位。",
+    "type": "text",
+    "default": "DSL = r\"\"\"{dsl}\"\"\"\\n"
+  },
+  "output_search_globs": {
+    "description": "用于搜索产出的通配符列表（按修改时间取最新）",
+    "type": "list",
+    "default": [
+      "vendor_pipeline/**/*.melsave",
+      "*.melsave"
+    ]
+  }
+}

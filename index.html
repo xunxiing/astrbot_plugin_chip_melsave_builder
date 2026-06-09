@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>沉玉仙茗 - Markdown 渲染器</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+    /* ========================================
+    核心变量定义 - 提取自你提供的图片
+    ========================================
+    */
+    :root {
+        --color-jade-dark: #1A3C38;   /* 深玉色 */
+        --color-jade-light: #6FBBA6;  /* 浅玉色 (灵濛山灵气) */
+        --color-tea-green: #A4C639;   /* 茶田绿 */
+        --color-autumn-gold: #D68C45; /* 红叶/夕阳金 */
+        --color-ink: #2C2C2C;         /* 水墨黑 */
+        --color-paper: #F4F1E8;       /* 宣纸白 */
+        --color-mist: rgba(255, 255, 255, 0.6);
+        
+        --shadow-card: 0 10px 40px -10px rgba(0, 40, 30, 0.4);
+        --font-main: 'Noto Serif SC', 'SimSun', serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: var(--font-main);
+        background-color: var(--color-jade-dark);
+        color: var(--color-ink);
+        line-height: 1.8;
+        overflow-x: hidden;
+    }
+
+    /* ========================================
+    背景视差层设计
+    ========================================
+    */
+    .bg-fixed {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background-size: cover;
+        background-position: center center;
+        background-repeat: no-repeat;
+        /* 使用你提供的图片作为背景：这里选用了那张视野开阔的茶田山景图 */
+        background-image: url('DE7E062755439B84010F505B209A8CB3.jpg'); 
+        filter: brightness(0.9) blur(2px);
+        transform: scale(1.1); /* 防止模糊边缘 */
+    }
+
+    /* 动态云雾遮罩 */
+    .mist-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        background: radial-gradient(circle at center, transparent 0%, var(--color-jade-dark) 100%);
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+    /* ========================================
+    主容器 - 仿古卷轴/悬浮卡片
+    ========================================
+    */
+    .container {
+        max-width: 900px;
+        margin: 60px auto;
+        background: rgba(244, 241, 232, 0.92); /* 宣纸质感，微透 */
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        padding: 60px 80px;
+        border-radius: 4px;
+        box-shadow: var(--shadow-card), 
+                    0 0 0 8px rgba(111, 187, 166, 0.1) inset; /* 内发光玉石边框 */
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* 顶部装饰纹样 - 模拟中式窗棂 */
+    .container::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 8px;
+        background: linear-gradient(90deg, var(--color-jade-dark), var(--color-jade-light), var(--color-jade-dark));
+    }
+
+    /* 底部装饰 */
+    .container::after {
+        content: "";
+        position: absolute;
+        bottom: 0; left: 0; right: 0; height: 20px;
+        background-image: radial-gradient(circle, var(--color-autumn-gold) 1px, transparent 1px);
+        background-size: 10px 10px;
+        opacity: 0.3;
+    }
+
+    /* ========================================
+    图片横幅 - 使用你提供的其他图片作为章节图
+    ========================================
+    */
+    .hero-banner {
+        width: calc(100% + 160px);
+        margin-left: -80px;
+        margin-top: -60px;
+        margin-bottom: 40px;
+        height: 300px;
+        overflow: hidden;
+        position: relative;
+        border-bottom: 4px solid var(--color-jade-dark);
+    }
+
+    .hero-banner img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center bottom;
+        /* 使用遗珑埠的图片作为头图 */
+        content: url('E1F884E56CFE45BA22AAB0C5E8D883F7.jpg');
+        transition: transform 10s ease;
+    }
+    
+    .hero-banner:hover img {
+        transform: scale(1.05);
+    }
+
+    .hero-title {
+        position: absolute;
+        bottom: 20px;
+        left: 80px;
+        color: #fff;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        font-size: 2.5em;
+        font-weight: 700;
+        z-index: 2;
+    }
+
+    /* ========================================
+    Markdown 元素样式渲染
+    ========================================
+    */
+
+    /* 标题系统 */
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--color-jade-dark);
+        margin-top: 1.5em;
+        margin-bottom: 0.8em;
+        font-weight: 700;
+        position: relative;
+    }
+
+    h1 {
+        font-size: 2.2em;
+        text-align: center;
+        border-bottom: 2px solid var(--color-jade-light);
+        padding-bottom: 20px;
+        background: linear-gradient(to right, var(--color-jade-dark), var(--color-jade-light));
+        -webkit-background-clip: text;
+        color: transparent;
+    }
+
+    h2 {
+        font-size: 1.8em;
+        padding-left: 15px;
+        border-left: 5px solid var(--color-autumn-gold);
+    }
+
+    h3 {
+        font-size: 1.4em;
+        color: var(--color-jade-light); /* 使用灵濛山的青色 */
+    }
+
+    /* 正文 */
+    p {
+        margin-bottom: 1.2em;
+        font-size: 1.05rem;
+        text-align: justify;
+    }
+
+    /* 引用块 - 模拟碑文或书卷批注 */
+    blockquote {
+        margin: 2em 0;
+        padding: 20px 30px;
+        background-color: rgba(26, 60, 56, 0.05);
+        border-left: none;
+        border-right: none;
+        position: relative;
+        font-style: italic;
+        color: #555;
+    }
+    blockquote::before {
+        content: "“";
+        font-size: 4em;
+        color: var(--color-jade-light);
+        position: absolute;
+        top: -20px; left: 10px;
+        opacity: 0.3;
+    }
+    blockquote::after {
+        content: "";
+        display: block;
+        width: 60px;
+        height: 3px;
+        background: var(--color-autumn-gold);
+        margin-top: 15px;
+    }
+
+    /* 代码块 - 沉色背景 */
+    pre {
+        background: #2b2b2b;
+        color: #f8f8f2;
+        padding: 20px;
+        border-radius: 8px;
+        overflow-x: auto;
+        border: 1px solid var(--color-jade-dark);
+        margin: 1.5em 0;
+    }
+    code {
+        font-family: Consolas, monospace;
+    }
+    p code {
+        background: rgba(214, 140, 69, 0.2);
+        color: #8a5a2b;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    /* 列表 */
+    ul, ol {
+        margin-left: 2em;
+        margin-bottom: 1.5em;
+    }
+    li {
+        margin-bottom: 0.5em;
+    }
+    ul li::marker {
+        color: var(--color-autumn-gold);
+    }
+
+    /* 链接 */
+    a {
+        color: var(--color-jade-light);
+        text-decoration: none;
+        border-bottom: 1px dashed var(--color-jade-light);
+        transition: all 0.3s;
+    }
+    a:hover {
+        color: var(--color-autumn-gold);
+        border-bottom-style: solid;
+    }
+
+    /* 分割线 - 使用云纹图片或者样式 */
+    hr {
+        border: 0;
+        height: 1px;
+        background-image: linear-gradient(to right, rgba(0, 0, 0, 0), var(--color-jade-dark), rgba(0, 0, 0, 0));
+        margin: 3em 0;
+    }
+
+    /* ========================================
+    文中插图样式 - 拍立得/明信片风格
+    ========================================
+    */
+    .img-showcase {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        margin: 30px 0;
+    }
+    .img-card {
+        flex: 1;
+        height: 200px;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: transform 0.3s;
+    }
+    .img-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    .img-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+        .container {
+            padding: 30px 20px;
+            margin: 20px auto;
+            width: 95%;
+        }
+        .hero-banner {
+            width: calc(100% + 40px);
+            margin-left: -20px;
+        }
+        .hero-title {
+            font-size: 1.8em;
+            left: 20px;
+        }
+        .img-showcase {
+            flex-direction: column;
+        }
+    }
+</style>
+</head>
+<body>
+
+    <div class="bg-fixed"></div>
+    <div class="mist-overlay"></div>
+
+    <main class="container">
+        
+        <div class="hero-banner">
+            <img src="E1F884E56CFE45BA22AAB0C5E8D883F7.jpg" alt="Liyue Harbor">
+            <div class="hero-title">沉玉仙茗 · 渲染示例</div>
+        </div>
+
+        <article>
+            <h1>第一章：玉璜之约</h1>
+            
+            <p>在那遥远的璃月西北，有一处被群山环抱的秘境，名为<b>沉玉谷</b>。这里终年云雾缭绕，茶香四溢，是仙人与凡世交汇之地。</p>
+            
+            <blockquote>
+                “山上之石，可攻玉；水中之灵，可养茶。此地风水，乃是帝君亲自勘定，每一片茶叶都蕴含着岩石的记忆。”
+            </blockquote>
+
+            <h2>翘英庄的清晨</h2>
+            <p>当第一缕阳光穿透薄雾，洒在层层叠叠的茶田之上，整个山谷便如同苏醒的巨兽。村民们背着竹篓，开始了一天的劳作。</p>
+
+            <div class="img-showcase">
+                <div class="img-card"><img src="C89F899EE5EDEF80F9978D68FD401711.jpg" alt="Tea Fields"></div>
+                <div class="img-card"><img src="866E91F0E10190B1126E1EE1FD83FCC4.jpg" alt="Jade Ring"></div>
+            </div>
+
+            <p>如果你仔细观察，会发现这里的水流呈现出一种奇异的<code>翡翠色</code>，这正是沉玉谷得名的由来——相传曾有仙人将一枚巨大的玉璜沉入水中，以此镇压了上古的洪水。</p>
+
+            <h3>特色景观</h3>
+            <ul>
+                <li><b>遗珑埠：</b> 连接枫丹与璃月的重要通商口岸，巨大的水力升降机令人叹为观止。</li>
+                <li><b>灵濛山：</b> 仙气最重之地，也是药君曾经的居所。</li>
+                <li><b>宝玦口：</b> 巨大的玉环悬于瀑布之上，那是力量与美学的极致结合。</li>
+            </ul>
+
+            <hr>
+
+            <h2>关于此样式</h2>
+            <p>这个 HTML 模板专为展示富含<b>东方美学</b>的内容而设计。它并没有使用复杂的 JavaScript，而是依靠大量的 CSS 细节来营造氛围：</p>
+            
+            <pre><code>/* 核心设计思路 */
+.style-concept {
+    theme: "Liyue - Chenyu Vale";
+    colors: ["Jade Green", "Paper White", "Autumn Gold"];
+    feeling: ["Ethereal", "Historic", "Peaceful"];
+}</code></pre>
+
+            <p>正如钟离先生所言：<a href="#">“欲买桂花同载酒，终不似，少年游。”</a> 但至少我们可以在这代码构建的画卷中，重温那一抹山水的颜色。</p>
+
+            <div style="text-align: center; margin-top: 50px;">
+                <img src="43E54C1B0B83BE254BECD9C569B520B7.jpg" style="max-width: 100%; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1);" alt="Landscape">
+                <p style="font-size: 0.8em; color: #666; margin-top: 10px;">赤望台远眺</p>
+            </div>
+
+        </article>
+    </main>
+
+</body>
+</html>

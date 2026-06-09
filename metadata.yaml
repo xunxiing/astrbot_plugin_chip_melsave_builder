@@ -1,0 +1,9 @@
+name: chip_melsave_builder
+title: 芯片构建与发送（LLM命名）
+version: 0.1.0
+author: xuxiing
+description: 将现有芯片构建脚本封装为 AstrBot 插件；一键运行、由 LLM 函数命名，并把 .melsave 文件发送给用户。
+license: MIT
+homepage: https://example.com/astrbot_plugin_chip_melsave_builder
+tags: [melsave, chip, build, llm, file]
+readme: README.md
