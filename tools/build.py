@@ -170,11 +170,13 @@ class ChipBuildTool(FunctionTool[AstrAgentContext]):
             )
 
         # 5) 成功：向用户发送文件（不包含日志文本）
+        # 优先尝试 OneBot v11 直接上传，失败时回退到 Comp.File
         try:
-            mer: MessageEventResult = event.chain_result(
-                [Comp.File(file=str(target), name=target.name)]
-            )
-            await event.send(mer)
+            if not await self.plugin._upload_file_via_onebot_v11(event, target):
+                mer: MessageEventResult = event.chain_result(
+                    [Comp.File(file=str(target), name=target.name)]
+                )
+                await event.send(mer)
             logs.append("✓ 文件已发送给用户")
         except Exception as e:
             logs.append(f"⚠ 发送文件失败（但文件已成功构建）: {e}")
